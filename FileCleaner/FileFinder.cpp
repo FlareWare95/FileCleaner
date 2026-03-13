@@ -1,6 +1,7 @@
 /**
 * Author: Austin Hall
-* Source File that logs all files older than a month old in the downloads folder
+* Source File that logs all files older than a month old in the downloads folder into a handy .txt
+* Will also send the summary as an email!
 */
 #include <windows.h>
 #include <ShlObj.h>
@@ -22,14 +23,20 @@ int createLog() {
 	std::wofstream file(filename); //create filstream to filename
 	
 	if (file.is_open()) {
-		file << "File Deletion Summary:";
-		file << "\n\n";
-		file << "We will be deleting the following files off your machine in TWO WEEKS:\n\n";
-		for (const std::wstring& files : flaggedFiles) {
-			file << files;
-			file << "\n";
+		file << "File Deletion Summary "; file << time.wMonth; file << "/"; file << time.wDay; file << "/"; file << time.wYear; file << ":\n\n";
+		file << "We will be deleting the following files off your machine in TWO WEEKS:\n";
+		file << "__________________________________________________________________________________\n\n";
+		if (flaggedFiles.size() == 0) {
+			file << "	No files met the deletion criteria!\n";
 		}
-		file << "You can review these files at\\033[1m "; file << filename; file << "\\033[0m before deletion.\n";
+		else {
+			for (const std::wstring& files : flaggedFiles) {
+				file << files; 
+				file << "\n";
+			}
+		}
+		file << "__________________________________________________________________________________\n";
+		file << "\nYou can review these files at "; file << filename; file << " before deletion.\n";
 		file << "\nIf any files listed need to be saved, move them out of the folder and to the SharePoint drive. Thank You!\n";
 		file.close();
 		printf("File created successfully!\n");
