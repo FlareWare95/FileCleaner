@@ -22,14 +22,15 @@ int createLog() {
 	std::wofstream file(filename); //create filstream to filename
 	
 	if (file.is_open()) {
-		file << filename;
+		file << "File Deletion Summary:";
 		file << "\n\n";
-		file << "We will be deleting the following files off your machine in TWO WEEKS:\n";
+		file << "We will be deleting the following files off your machine in TWO WEEKS:\n\n";
 		for (const std::wstring& files : flaggedFiles) {
 			file << files;
 			file << "\n";
 		}
-		file << "You can review these files at [FOLDER PATH] before deletion.";
+		file << "You can review these files at\\033[1m "; file << filename; file << "\\033[0m before deletion.\n";
+		file << "\nIf any files listed need to be saved, move them out of the folder and to the SharePoint drive. Thank You!\n";
 		file.close();
 		printf("File created successfully!\n");
 	}
