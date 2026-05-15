@@ -26,7 +26,7 @@ int createLog() {
 	SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &desktopPath);
 	swprintf(filename, _countof(filename), L"%s\\Deletion Log %d-%d-%d.txt", desktopPath, time.wMonth, time.wDay, time.wYear);
 
-	std::wofstream file(filename); //create filstream to filename
+	std::wofstream file(filename); //create filestream to filename
 	
 	if (file.is_open()) {
 		file << "File Deletion Summary "; file << time.wMonth; file << "/"; file << time.wDay; file << "/"; file << time.wYear; file << ":\n\n";
@@ -77,26 +77,22 @@ int findFiles(PWSTR path) {
 		auto clockCast = std::chrono::clock_cast<std::chrono::system_clock>(writeTime);
 		auto clockFloor = std::chrono::floor<std::chrono::days>(clockCast);
 		std::chrono::year_month_day ymd{clockFloor};
+
 		if (ymd.year() < currentYmd.year()) {
 			
-			printf("Adding file to vector (year): ");
+			printf("Adding (year): ");
 
 			std::cout << file.path().filename();
 			std::cout << "\n";
 			flaggedFiles.insert(flaggedFiles.end(),file.path().filename().wstring());
-		}
-		else if (ymd.month() < currentYmd.month()) { //same year different month
-			printf("Adding file to vector (month): ");
+
+		} else if (ymd.month() < currentYmd.month()) {
+			printf("Adding (month): ");
 
 			std::cout << file.path().filename();
 			std::cout << "\n";
 			flaggedFiles.insert(flaggedFiles.end(), file.path().filename().wstring());
 		}
-
-		
-		//if (file.last_write_time() < 0) {
-		//	printf("%s\n", file.path().filename().string().c_str());
-		//}
 		
 	}
 
