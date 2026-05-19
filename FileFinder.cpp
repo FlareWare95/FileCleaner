@@ -12,7 +12,11 @@
 #include <iostream>
 
 std::vector<std::wstring> flaggedFiles;
+
+PWSTR downloadsPath;
 PWSTR desktopPath = nullptr;
+PWSTR folderPath;
+PCWSTR folderName = L"Flagged Items";
 
 
 /*
@@ -43,7 +47,7 @@ int createLog() {
 			}
 		}
 		file << "__________________________________________________________________________________\n";
-		file << "\nYou can review these files at "; file << filename; file << " before deletion.\n";
+		file << "\nYou can review these files at "; file << folderPath; file << " before deletion.\n";
 		file << "\nIf any files listed need to be saved, move them out of the folder and to the SharePoint drive before they are lost forever. Thank You!\n";
 		file << "\n\n* Feel free to delete this log after you are done reading. *";
 		file.close();
@@ -57,7 +61,7 @@ int createLog() {
 
 }
 
-int findFiles(PWSTR path) {
+int findFiles(PWSTR path, std::wstring folder, bool checkMonth) {
 
 	//we need all of this to convert the current system clock to a point where we can get individual yy mm dd
 	auto currentTime = std::chrono::system_clock::now();
@@ -85,8 +89,17 @@ int findFiles(PWSTR path) {
 			std::cout << file.path().filename();
 			std::cout << "\n";
 			flaggedFiles.insert(flaggedFiles.end(),file.path().filename().wstring());
+			try {
+				std::filesystem::copy(file.path(), folder);
+				std::filesystem::remove_all(file.path());
+				
+			}
+			catch (std::filesystem::filesystem_error) {
+				printf("error moving file / directory: %ws, %ws\n", file.path());
+			}
+			
 
-		} else if (ymd.month() < currentYmd.month()) {
+		} else if (ymd.month() < currentYmd.month() && checkMonth) {
 			printf("Adding (month): ");
 
 			std::cout << file.path().filename();
@@ -99,11 +112,37 @@ int findFiles(PWSTR path) {
 	return 0;
 }
 
+int makeFolder(PWSTR path) { 
+	
+	if (!std::filesystem::exists(path)) {
+		std::filesystem::create_directories(path);
+		printf("Deletion Folder Created\n");
+		return 0;
+	}
+	else {
+		printf("folder already exists or error finding file.\n");
+	}
+
+}
+
 int main() {
-	PWSTR path;
-	SHGetKnownFolderPath(FOLDERID_Downloads, 0, nullptr, &path);
-	printf("%ws\n",path);
-	findFiles(path);
-	createLog();
+	//Get paths of known directories (downloads, desktop, etc) here
+	SHGetKnownFolderPath(FOLDERID_Downloads, 0, nullptr, &downloadsPath);
+	SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &folderPath);
+	
+	//create folder if not already there.
+	printf("%ws\n", folderPath);
+	std::wstring folder(folderPath);
+	folder.append(L"\\");
+	folder.append(folderName);
+	makeFolder(folder.data());
+
+	////flag and move files.
+	findFiles(downloadsPath, folder, false);
+
+	////create txt log.
+	//createLog();
+
+	//cleanup
 	CoTaskMemFree(desktopPath);
 }
