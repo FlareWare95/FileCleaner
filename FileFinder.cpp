@@ -14,10 +14,10 @@
 
 std::vector<std::wstring> flaggedFiles;
 PWSTR downloadsPath;
-PWSTR desktopPath;
+PWSTR logPath;
 PWSTR folderPath;
 PWSTR folderName;
-bool debug = false;
+bool debug = true;
 
 /*
 * Creates and formats the log (.txt) written to the current user's desktop. 
@@ -27,8 +27,10 @@ int createLog() {
 	GetLocalTime(&time); 
 	wchar_t filename[500];
 
-	SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &folderPath);
-	swprintf_s(filename, _countof(filename), L"%s\\Deletion Log %d-%d-%d.txt", folderPath, time.wMonth, time.wDay, time.wYear);
+	if (logPath == NULL) {
+		SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &logPath);
+	}
+	swprintf_s(filename, _countof(filename), L"%s\\Deletion Log %d-%d-%d.txt", logPath, time.wMonth, time.wDay, time.wYear);
 
 	std::wofstream file(filename); //create filestream to filename
 	
@@ -47,7 +49,7 @@ int createLog() {
 			}
 		}
 		file << "__________________________________________________________________________________\n";
-		file << "\nYou can review these files at "; file << folderPath; file << " before deletion.\n";
+		file << "\nYou can review these files at "; file << logPath; file << " before deletion.\n";
 		file << "\nIf any files listed need to be saved, move them out of the folder and to the SharePoint drive before they are lost forever. Thank You!\n";
 		file << "\n\n* Feel free to delete this log after you are done reading. *";
 		file.close();
@@ -68,25 +70,22 @@ int createLog() {
 
 /*
 * This function iterates through the path folder, and if it meets the criteria for deletion, will be moved to the folder specified. 
-* PWSTR path - the path to iterate through
-* wstring folder - where to place the files that meet criteria
 * bool checkmonth - if true we check the month var, mostly for testing
 */
-int findFiles(PWSTR path, std::wstring folder, bool checkMonth) {
+int findFiles(bool checkMonth) {
 
 	//we need all of this to convert the current system clock to a point where we can get individual yy mm dd
 	auto currentTime = std::chrono::system_clock::now();
 	auto currentTimeCast = std::chrono::clock_cast<std::chrono::system_clock>(currentTime);
 	auto currentTimeFloor = std::chrono::floor<std::chrono::days>(currentTimeCast);
-	std::chrono::year_month_day currentYmd{ currentTimeFloor };
+	std::chrono::year_month_day currentYmd{currentTimeFloor};
 	if (debug) {
 		printf_s("Current Time:");
+		std::cout << currentTime;
+		std::cout << "\n";
 	}
-	
-	std::cout << currentTime;
-	std::cout << "\n";
 
-	for (const auto& file : std::filesystem::directory_iterator(path)) {
+	for (const auto& file : std::filesystem::directory_iterator(downloadsPath)) {
 		auto writeTime = file.last_write_time();
 		auto clockCast = std::chrono::clock_cast<std::chrono::system_clock>(writeTime);
 		auto clockFloor = std::chrono::floor<std::chrono::days>(clockCast);
@@ -101,7 +100,7 @@ int findFiles(PWSTR path, std::wstring folder, bool checkMonth) {
 
 			flaggedFiles.insert(flaggedFiles.end(),file.path().filename().wstring());
 			try {
-				std::filesystem::copy(file.path(), folder);
+				std::filesystem::copy(file.path(), folderPath);
 				std::filesystem::remove_all(file.path());
 			}
 			catch (std::filesystem::filesystem_error) {
@@ -109,8 +108,6 @@ int findFiles(PWSTR path, std::wstring folder, bool checkMonth) {
 					printf_s("error moving file or directory\n");
 				}
 			}
-			
-
 		} else if (ymd.month() < currentYmd.month() && checkMonth) {
 			if (debug) {
 				printf_s("Adding (month): ");
@@ -127,9 +124,23 @@ int findFiles(PWSTR path, std::wstring folder, bool checkMonth) {
 
 /**
 * creates the folder that the flagged files will be copied to.
-* PWSTR path - where you want the folder to appear.
 */
-int makeFolder(PWSTR path) { 
+int makeFolder() { 
+
+	if (folderPath == NULL) {
+		SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &folderPath);
+	}
+	if (folderName == NULL) {
+		folderName = const_cast<PWSTR>(L"Flagged Items");
+	}
+
+	std::wstring folder(folderPath);
+	folder.append(L"\\");
+	folder.append(folderName);
+	if (debug) {
+		printf("%ws\n%ws\n", folderPath, folder.data());
+	}
+	PWSTR path = folder.data();
 	
 	if (!std::filesystem::exists(path)) {
 		std::filesystem::create_directories(path);
@@ -148,52 +159,41 @@ int makeFolder(PWSTR path) {
 }
 
 /*
-* Format Args: FileCleaner.exe [debug] [FOLDERPATH] [FOLDERNAME]
+* Format Args: FileCleaner.exe [bool debug] [str FOLDERPATH] [str FOLDERNAME]
 */
 int main(int numArgs, char* args[]) {
-	//Get paths of known directories (downloads, desktop, etc) here
+
+	//we know for sure we want the user's downloads folder
 	SHGetKnownFolderPath(FOLDERID_Downloads, 0, nullptr, &downloadsPath);
-	if (numArgs == 1) {
-		
-		SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &folderPath);
-		folderName = const_cast<PWSTR>(L"Flagged Items");
-	}
-	else if (numArgs == 4) {
-		CStringW temp = CStringW(args[2]);
-		folderPath = temp.GetBuffer(temp.GetLength());
-		temp = CStringW(args[3]);
-		folderName = temp.GetBuffer(temp.GetLength());
-		if (strcmp(args[1], "true") == 0) {
-			debug = true; 
+
+	if (numArgs > 1) {
+		if (numArgs == 2) {
+			if (strcmp(args[1], "true") == 0) {
+				debug = true;
+			}
+		}
+		else if (numArgs == 4) {
+			CStringW temp = CStringW(args[2]);
+			folderPath = temp.GetBuffer(temp.GetLength());
+			temp = CStringW(args[3]);
+			folderName = temp.GetBuffer(temp.GetLength());
+			if (strcmp(args[1], "true") == 0) {
+				debug = true;
+			}
 		}
 	}
-	else {
-		printf("Argument Format Error: Arguments should be formatted as such:\nFileCleaner.exe [FOLDERPATH] [FOLDERNAME]\n");
-		return 1;
-	}
 
-
-	
 	//create folder if not already there.
-	if (debug) {
-		printf("%ws\n", folderPath);
-	}
-	
-	std::wstring folder(folderPath);
-	folder.append(L"\\");
-	folder.append(folderName);
-
-	if (debug) {
-		printf("%ws", folder.data());
-	}
-	makeFolder(folder.data());
+	makeFolder();
 
 	//flag and move files.
-	findFiles(downloadsPath, folder, false);
+	findFiles(false);
 
 	//create txt log.
 	createLog();
 
 	//cleanup
-	CoTaskMemFree(desktopPath);
+	CoTaskMemFree(logPath);
+	CoTaskMemFree(downloadsPath);
+	CoTaskMemFree(folderPath);
 }
