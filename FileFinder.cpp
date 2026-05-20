@@ -1,34 +1,34 @@
 /*
 * Author: Austin Hall
-* Source File that logs all files older than a month old in the downloads folder into a handy .txt
-* Will also send the summary as an email!
+* Program that sorts and logs all files older than a month old in the downloads folder into a handy .txt
+* Will also send the summary as an email hopefully using smtp relay!
 */
 #include <windows.h>
 #include <ShlObj.h>
+#include <string.h>
+#include <atlstr.h>
 #include <fstream>
 #include <vector>
 #include <filesystem>
-#include <string.h>
 #include <iostream>
 
 std::vector<std::wstring> flaggedFiles;
-
 PWSTR downloadsPath;
-PWSTR desktopPath = nullptr;
+PWSTR desktopPath;
 PWSTR folderPath;
-PCWSTR folderName = L"Flagged Items";
-
+PWSTR folderName;
+bool debug = false;
 
 /*
-* Creates and formats the log (.txt) written to the current user's desktop. CHANGE THE SECOND FILENAME TO THE ACUTAL FOLDER'S PLACE!!!!
+* Creates and formats the log (.txt) written to the current user's desktop. 
 */
 int createLog() {
 	SYSTEMTIME time;
 	GetLocalTime(&time); 
 	wchar_t filename[500];
 
-	SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &desktopPath);
-	swprintf(filename, _countof(filename), L"%s\\Deletion Log %d-%d-%d.txt", desktopPath, time.wMonth, time.wDay, time.wYear);
+	SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &folderPath);
+	swprintf_s(filename, _countof(filename), L"%s\\Deletion Log %d-%d-%d.txt", folderPath, time.wMonth, time.wDay, time.wYear);
 
 	std::wofstream file(filename); //create filestream to filename
 	
@@ -51,16 +51,27 @@ int createLog() {
 		file << "\nIf any files listed need to be saved, move them out of the folder and to the SharePoint drive before they are lost forever. Thank You!\n";
 		file << "\n\n* Feel free to delete this log after you are done reading. *";
 		file.close();
-		printf("File created successfully!\n");
+
+		if (debug) {
+			printf_s("Log file created successfully!\n");
+		}
 	}
 	else {
-		printf("Error creating file!!!!\n");
-		return 0;
+		if (debug) {
+			printf_s("Error creating file!!!!\n");
+		}
+		return 1;
 	}
-	return 1;
+	return 0;
 
 }
 
+/*
+* This function iterates through the path folder, and if it meets the criteria for deletion, will be moved to the folder specified. 
+* PWSTR path - the path to iterate through
+* wstring folder - where to place the files that meet criteria
+* bool checkmonth - if true we check the month var, mostly for testing
+*/
 int findFiles(PWSTR path, std::wstring folder, bool checkMonth) {
 
 	//we need all of this to convert the current system clock to a point where we can get individual yy mm dd
@@ -68,13 +79,12 @@ int findFiles(PWSTR path, std::wstring folder, bool checkMonth) {
 	auto currentTimeCast = std::chrono::clock_cast<std::chrono::system_clock>(currentTime);
 	auto currentTimeFloor = std::chrono::floor<std::chrono::days>(currentTimeCast);
 	std::chrono::year_month_day currentYmd{ currentTimeFloor };
-
-
-	printf("Current Time:");
+	if (debug) {
+		printf_s("Current Time:");
+	}
 	
 	std::cout << currentTime;
 	std::cout << "\n";
-
 
 	for (const auto& file : std::filesystem::directory_iterator(path)) {
 		auto writeTime = file.last_write_time();
@@ -83,65 +93,106 @@ int findFiles(PWSTR path, std::wstring folder, bool checkMonth) {
 		std::chrono::year_month_day ymd{clockFloor};
 
 		if (ymd.year() < currentYmd.year()) {
-			
-			printf("Adding (year): ");
+			if (debug) {
+				printf_s("Adding (year): ");
+				std::cout << file.path().filename();
+				std::cout << "\n";
+			}
 
-			std::cout << file.path().filename();
-			std::cout << "\n";
 			flaggedFiles.insert(flaggedFiles.end(),file.path().filename().wstring());
 			try {
 				std::filesystem::copy(file.path(), folder);
 				std::filesystem::remove_all(file.path());
-				
 			}
 			catch (std::filesystem::filesystem_error) {
-				printf("error moving file / directory: %ws, %ws\n", file.path());
+				if (debug) {
+					printf_s("error moving file or directory\n");
+				}
 			}
 			
 
 		} else if (ymd.month() < currentYmd.month() && checkMonth) {
-			printf("Adding (month): ");
+			if (debug) {
+				printf_s("Adding (month): ");
+				std::cout << file.path().filename();
+				std::cout << "\n";
+			}
 
-			std::cout << file.path().filename();
-			std::cout << "\n";
 			flaggedFiles.insert(flaggedFiles.end(), file.path().filename().wstring());
 		}
-		
 	}
 
 	return 0;
 }
 
+/**
+* creates the folder that the flagged files will be copied to.
+* PWSTR path - where you want the folder to appear.
+*/
 int makeFolder(PWSTR path) { 
 	
 	if (!std::filesystem::exists(path)) {
 		std::filesystem::create_directories(path);
-		printf("Deletion Folder Created\n");
+		if (debug) {
+			printf("Deletion Folder Created\n");
+
+		}
 		return 0;
 	}
 	else {
-		printf("folder already exists or error finding file.\n");
+		if (debug) {
+			printf("folder already exists or error finding file.\n");
+		}
+		return 1;
 	}
-
 }
 
-int main() {
+/*
+* Format Args: FileCleaner.exe [debug] [FOLDERPATH] [FOLDERNAME]
+*/
+int main(int numArgs, char* args[]) {
 	//Get paths of known directories (downloads, desktop, etc) here
 	SHGetKnownFolderPath(FOLDERID_Downloads, 0, nullptr, &downloadsPath);
-	SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &folderPath);
+	if (numArgs == 1) {
+		
+		SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &folderPath);
+		folderName = const_cast<PWSTR>(L"Flagged Items");
+	}
+	else if (numArgs == 4) {
+		CStringW temp = CStringW(args[2]);
+		folderPath = temp.GetBuffer(temp.GetLength());
+		temp = CStringW(args[3]);
+		folderName = temp.GetBuffer(temp.GetLength());
+		if (strcmp(args[1], "true") == 0) {
+			debug = true; 
+		}
+	}
+	else {
+		printf("Argument Format Error: Arguments should be formatted as such:\nFileCleaner.exe [FOLDERPATH] [FOLDERNAME]\n");
+		return 1;
+	}
+
+
 	
 	//create folder if not already there.
-	printf("%ws\n", folderPath);
+	if (debug) {
+		printf("%ws\n", folderPath);
+	}
+	
 	std::wstring folder(folderPath);
 	folder.append(L"\\");
 	folder.append(folderName);
+
+	if (debug) {
+		printf("%ws", folder.data());
+	}
 	makeFolder(folder.data());
 
-	////flag and move files.
+	//flag and move files.
 	findFiles(downloadsPath, folder, false);
 
-	////create txt log.
-	//createLog();
+	//create txt log.
+	createLog();
 
 	//cleanup
 	CoTaskMemFree(desktopPath);
