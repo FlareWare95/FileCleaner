@@ -1,8 +1,10 @@
-/*
+/*******************************************//**
 * Author: Austin Hall
-* Program that sorts and logs all files older than a month old in the downloads folder into a handy .txt
+* Program that sorts and logs all files older than a month old in the downloads folder, and produces a handy .txt log.
+* User / Administrator can specify where they want the flagged files folder and txt log.
 * Will also send the summary as an email hopefully using smtp relay!
-*/
+ ***********************************************/
+
 #include <windows.h>
 #include <ShlObj.h>
 #include <string.h>
@@ -17,10 +19,11 @@ PWSTR downloadsPath;
 PWSTR logPath;
 PWSTR folderPath;
 PWSTR folderName;
+std::wstring path;
 bool debug = true;
 
 /*
-* Creates and formats the log (.txt) written to the current user's desktop. 
+* @brief Creates and formats the log (.txt) written to the current user's desktop. 
 */
 int createLog() {
 	SYSTEMTIME time;
@@ -29,6 +32,7 @@ int createLog() {
 
 	if (logPath == NULL) {
 		SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &logPath);
+		CoTaskMemFree(logPath);
 	}
 	swprintf_s(filename, _countof(filename), L"%s\\Deletion Log %d-%d-%d.txt", logPath, time.wMonth, time.wDay, time.wYear);
 
@@ -65,12 +69,11 @@ int createLog() {
 		return 1;
 	}
 	return 0;
-
 }
 
 /*
-* This function iterates through the path folder, and if it meets the criteria for deletion, will be moved to the folder specified. 
-* bool checkmonth - if true we check the month var, mostly for testing
+* @brief This function iterates through the path folder, and if it meets the criteria for deletion, will be moved to the folder specified. 
+* @param checkmonth - if true we check the month var, mostly for testing
 */
 int findFiles(bool checkMonth) {
 
@@ -91,39 +94,34 @@ int findFiles(bool checkMonth) {
 		auto clockFloor = std::chrono::floor<std::chrono::days>(clockCast);
 		std::chrono::year_month_day ymd{clockFloor};
 
-		if (ymd.year() < currentYmd.year()) {
-			if (debug) {
-				printf_s("Adding (year): ");
-				std::cout << file.path().filename();
-				std::cout << "\n";
-			}
-
-			flaggedFiles.insert(flaggedFiles.end(),file.path().filename().wstring());
+		if (ymd.year() < currentYmd.year() || (checkMonth && (ymd.month() < currentYmd.month()))) {
 			try {
-				std::filesystem::copy(file.path(), folderPath);
-				std::filesystem::remove_all(file.path());
-			}
-			catch (std::filesystem::filesystem_error) {
 				if (debug) {
-					printf_s("error moving file or directory\n");
+					printf_s("Adding: ");
+					std::cout << file.path().filename();
+					std::cout << "\n";
 				}
-			}
-		} else if (ymd.month() < currentYmd.month() && checkMonth) {
-			if (debug) {
-				printf_s("Adding (month): ");
-				std::cout << file.path().filename();
-				std::cout << "\n";
+				std::filesystem::copy(file.path(), path.data()); //copy the file into the folder.
+				
+			} catch (std::filesystem::filesystem_error e) {
+				if (debug) {
+					std::wcout << e.what();
+					std::cout << "\n";
+				}
+				continue;
 			}
 
+			//only log delete if we can copy the file into the folder.
 			flaggedFiles.insert(flaggedFiles.end(), file.path().filename().wstring());
-		}
+			std::filesystem::remove_all(file.path());
+		} 
 	}
 
 	return 0;
 }
 
 /**
-* creates the folder that the flagged files will be copied to.
+* @brief Creates the folder that the flagged files will be copied to.
 */
 int makeFolder() { 
 
@@ -137,13 +135,14 @@ int makeFolder() {
 	std::wstring folder(folderPath);
 	folder.append(L"\\");
 	folder.append(folderName);
+	path = folder.data();
 	if (debug) {
-		printf("%ws\n%ws\n", folderPath, folder.data());
+		printf("%ws\nFull path: %ws\n", folderPath, folder.data());
 	}
-	PWSTR path = folder.data();
 	
-	if (!std::filesystem::exists(path)) {
-		std::filesystem::create_directories(path);
+	
+	if (!std::filesystem::exists(path.c_str())) {
+		std::filesystem::create_directories(path.data());
 		if (debug) {
 			printf("Deletion Folder Created\n");
 
@@ -157,14 +156,15 @@ int makeFolder() {
 		return 1;
 	}
 }
-
+ 
 /*
-* Format Args: FileCleaner.exe [bool debug] [str FOLDERPATH] [str FOLDERNAME]
+* @brief Format Args: FileCleaner.exe [bool debug] [str FOLDERPATH] [str FOLDERNAME]
 */
 int main(int numArgs, char* args[]) {
 
 	//we know for sure we want the user's downloads folder
 	SHGetKnownFolderPath(FOLDERID_Downloads, 0, nullptr, &downloadsPath);
+	CoTaskMemFree(downloadsPath);
 
 	if (numArgs > 1) {
 		if (numArgs == 2) {
@@ -181,19 +181,18 @@ int main(int numArgs, char* args[]) {
 				debug = true;
 			}
 		}
+		else {
+			printf("Argument Format Error: Arguments should be formatted as such:\nFileCleaner.exe [DEBUG] [FOLDERPATH] [FOLDERNAME]\n");
+			return 1;
+		}
 	}
 
 	//create folder if not already there.
 	makeFolder();
 
 	//flag and move files.
-	findFiles(false);
+	findFiles(true);
 
 	//create txt log.
 	createLog();
-
-	//cleanup
-	CoTaskMemFree(logPath);
-	CoTaskMemFree(downloadsPath);
-	CoTaskMemFree(folderPath);
 }
