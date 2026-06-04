@@ -1,3 +1,4 @@
+# FileCleaner
 FileCleaner is a tool that will help manage disk space on a user's device by encouraging them to review unused files before deciding on whether they need to upload those to a company's sharepoint, or deleted instead. The FileCleaner works in two parts: 
 	
 ## FileFinder: 
@@ -13,5 +14,3 @@ While not yet implemented, there will be an overhaul regarding security and flex
 - Easy settings configuration through .txt file or json instead of cmdline options like it currently has
 - SHA-256 encryption to ensure no tampering of said config file has happened
 - Any other security is recommended to me
-
-This project is on GitHub: github.com/FlareWare95/FileCleaner.
