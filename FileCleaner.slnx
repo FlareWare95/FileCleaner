@@ -1,9 +1,0 @@
-<Solution>
-  <Configurations>
-    <Platform Name="x64" />
-    <Platform Name="x86" />
-  </Configurations>
-  <Project Path="FileCleaner/FileCleaner.vcxproj" Id="d3701204-5ea9-4852-ac83-da658c2c431b" />
-  <Project Path="FolderCleaner/FolderCleaner.vcxproj" Id="1674c09b-ca90-42a3-8904-34f7844f1c0d" />
-  <Project Path="Setup/Setup.vcxproj" Id="160dbe5b-e390-4050-ad3f-b6ea18b83636" />
-</Solution>

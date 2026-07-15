@@ -9,3 +9,4 @@ Release/
 *.pdb
 *.vcxproj
 *.vcxproj.filters
+*slnx
