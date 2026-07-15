@@ -1,0 +1,11 @@
+.vs/
+x64/
+x86/
+Debug/
+Release/
+*.user
+*.suo
+*.obj
+*.pdb
+*.vcxproj
+*.vcxproj.filters
