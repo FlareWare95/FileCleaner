@@ -15,7 +15,6 @@
 #include <ShlObj.h>
 #include <atlstr.h>
 #include <lmcons.h>
-#include <string.h>
 #include <windows.h>
 
 #include <filesystem>
@@ -26,7 +25,7 @@
 
 std::vector<std::wstring> flaggedFiles;
 std::vector<std::wstring> directories;
-PWSTR logPath;
+std::wstring logPath;
 std::wstring folderPath;
 std::wstring folderName;
 bool debug = false;
@@ -45,6 +44,7 @@ int simpleTrim(std::wstring& ln) {
 
   return 0;
 }
+
 /*
  * @brief Finds all instances of %user in a line, replaces it with the current
  * user's username.
@@ -121,6 +121,17 @@ int readSettings() {
 
     } else if (start.starts_with(L"Directories to Check:")) {
       getDirectories(ln);
+    } else if (start.starts_with(L"Log Path:")) {
+      if (ln._Equal(L"Default")) {
+        PWSTR temp;
+        SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &temp);
+        ln = temp;
+        ln.append(L"\\");
+        ln.append(folderName);
+        logPath = ln.data();
+      } else {
+        logPath = ln;
+      }
     } else {
       if (debug) std::wcout << "Skipping: " << start.data() << "\n";
     }
@@ -136,10 +147,6 @@ int createLog() {
   GetLocalTime(&time);
   wchar_t filename[500];
 
-  if (logPath == NULL) {
-    SHGetKnownFolderPath(FOLDERID_Desktop, 0, nullptr, &logPath);
-    CoTaskMemFree(logPath);
-  }
   swprintf_s(filename, _countof(filename), L"%s\\Deletion Log %d-%d-%d.txt",
              logPath, time.wMonth, time.wDay, time.wYear);
 
