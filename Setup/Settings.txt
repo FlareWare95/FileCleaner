@@ -1,0 +1,8 @@
+Debug: true
+Folder Name:  Flagged Items             
+Folder Destination: Default
+Log Path: Default
+Delete Destination: C:\Users\%user\Downloads     
+Directories to Check: C:\Users\%user\Downloads 
+Delete Folder?: true
+Delete Temp Files?: true
