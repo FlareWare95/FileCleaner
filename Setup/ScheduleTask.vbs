@@ -1,5 +1,5 @@
 '------------------------------------------------------------------
-' This sample schedules a task to start on a weekly basis.
+' This file was made via template from https://learn.microsoft.com/en-us/windows/win32/taskschd/weekly-trigger-example--scripting- thanks!
 '------------------------------------------------------------------
 Dim namedArgs
 Set namedArgs = WScript.Arguments.Named
